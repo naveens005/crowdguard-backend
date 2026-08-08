@@ -3260,33 +3260,38 @@ def api_simulate(action):
     return jsonify({"ok": True})
 
 
+# Runs on import, not just when this file is executed directly, so that
+# production servers like gunicorn (which import `app.py` as a module and
+# never hit __name__ == "__main__") still create tables, seed default
+# users/officials, and load state before serving any requests.
+init_db()
+bootstrap_default_users()
+bootstrap_default_officials()
+load_settings()
+load_camera_settings()
+
+_all_history = load_recent_history(limit=1500)
+for _p in _all_history:
+    _cam = get_or_create_camera(_p["camera_id"] or DEFAULT_CAMERA_ID)
+    _cam["history"].append({"t": _p["t"], "count": _p["count"]})
+for _a in reversed(load_recent_alerts(50)):
+    ALERTS.appendleft(_a)
+for _s in reversed(load_recent_sms(50)):
+    SMS_LOG.appendleft(_s)
+for _e in reversed(load_recent_audit_log(150)):
+    AUDIT_LOG.appendleft(_e)
+
+for _cam in CAMERAS.values():
+    if _cam["history"]:
+        _last = _cam["history"][-1]
+        _cam["current_count"] = _last["count"]
+        _cam["risk_level"] = compute_risk(_last["count"], _cam["max_capacity"])
+
+if not CAMERAS:
+    get_or_create_camera(DEFAULT_CAMERA_ID)
+
+
 if __name__ == "__main__":
-    init_db()
-    bootstrap_default_users()
-    bootstrap_default_officials()
-    load_settings()
-    load_camera_settings()
-
-    all_history = load_recent_history(limit=1500)
-    for p in all_history:
-        cam = get_or_create_camera(p["camera_id"] or DEFAULT_CAMERA_ID)
-        cam["history"].append({"t": p["t"], "count": p["count"]})
-    for a in reversed(load_recent_alerts(50)):
-        ALERTS.appendleft(a)
-    for s in reversed(load_recent_sms(50)):
-        SMS_LOG.appendleft(s)
-    for e in reversed(load_recent_audit_log(150)):
-        AUDIT_LOG.appendleft(e)
-
-    for cam in CAMERAS.values():
-        if cam["history"]:
-            last = cam["history"][-1]
-            cam["current_count"] = last["count"]
-            cam["risk_level"] = compute_risk(last["count"], cam["max_capacity"])
-
-    if not CAMERAS:
-        get_or_create_camera(DEFAULT_CAMERA_ID)
-
     print("\nCROWD GUARD 2.0 server starting...")
     print("Open this on the SAME device:   http://localhost:5000")
     print("Open this from phone/tablet/other laptop on the same Wi-Fi:")
