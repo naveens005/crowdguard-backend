@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CROWD GUARD 2.0 | Sign In</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ v }}">
+<script>
+  // Applied inline (before the rest of the page renders) so the login
+  // page respects whichever theme was last chosen on the dashboard,
+  // instead of flashing dark and then switching.
+  (function () {
+    if ((localStorage.getItem("cg_theme") || "dark") === "light") {
+      document.documentElement.setAttribute("data-theme", "light");
+    }
+  })();
+</script>
+<style>
+  .login-wrap {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+  }
+  .login-card {
+    width: 340px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 28px; padding: 30px; text-align: center;
+  }
+  .login-brand { font-family: var(--font-display); font-weight: 700; font-size: 20px;
+                 color: var(--text); margin-bottom: 4px; }
+  .login-sub { color: var(--text-dim); font-size: 12px; margin-bottom: 20px; }
+  .login-card input[type="password"] {
+    width: 100%; padding: 11px 16px; background: var(--panel-raised);
+    border: 1px solid var(--border); border-radius: 999px; color: var(--text);
+    font-family: var(--font-mono); font-size: 14px; margin-bottom: 14px;
+    text-align: center;
+  }
+  .login-card button {
+    width: 100%; padding: 11px; background: var(--white); color: #000000;
+    border: none; border-radius: 999px; font-weight: 700; cursor: pointer;
+    font-family: var(--font-body);
+  }
+  .login-error { color: var(--text); background: var(--panel-raised);
+                 border: 1px solid var(--border); border-left: 3px solid var(--critical);
+                 border-radius: 4px; padding: 8px 10px; font-size: 12px; margin-bottom: 14px; }
+  .login-note { color: var(--text-faint); font-size: 11px; margin-top: 16px; line-height: 1.5; }
+  .login-card input[type="text"] {
+    width: 100%; padding: 11px 16px; background: var(--panel-raised);
+    border: 1px solid var(--border); border-radius: 999px; color: var(--text);
+    font-family: var(--font-mono); font-size: 14px; margin-bottom: 14px;
+    text-align: center; box-sizing: border-box;
+  }
+  .login-card input[type="password"] { box-sizing: border-box; }
+  .login-divider { color: var(--text-faint); font-size: 11px; margin: 4px 0 14px; }
+</style>
+</head>
+<body>
+  <div class="login-wrap">
+    <form class="login-card" method="POST" action="{{ url_for('login') }}">
+      <div class="login-brand">&#128737; CROWD GUARD <b>2.0</b></div>
+      <div class="login-sub">Sign in to view the live dashboard</div>
+      {% if error %}<div class="login-error">{{ error }}</div>{% endif %}
+      <input type="hidden" name="next" value="{{ next_path }}">
+      <input type="text" name="username" placeholder="Username (optional)" autofocus>
+      <input type="password" name="password" placeholder="Password (with username above)">
+      <div class="login-divider">— or, without an individual account —</div>
+      <input type="password" name="key" placeholder="Shared admin/viewer API key">
+      <button type="submit">Sign In</button>
+      <div class="login-note">
+        Have an individual account? Use your username + password.
+        Otherwise use the shared key (ADMIN_API_KEY, printed in the
+        server console on startup, or your own from .env).
+      </div>
+    </form>
+  </div>
+</body>
+</html>

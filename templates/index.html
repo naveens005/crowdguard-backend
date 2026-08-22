@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CROWD GUARD 2.0 | Live Dashboard</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ v }}">
+<script src="{{ url_for('static', filename='socket.io.min.js') }}?v={{ v }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-icon"><span>&#128737;</span></span>
+      <span>CROWD GUARD <b>2.0</b></span>
+    </div>
+    <nav>
+      <button class="nav-item active" data-tab="dashboard">&#9638; Dashboard</button>
+      <button class="nav-item" data-tab="analytics">&#128202; Analytics</button>
+      <button class="nav-item" data-tab="alerts">&#128276; Alerts &amp; Controls</button>
+    </nav>
+    <div class="system-status">
+      <div class="status-title">System Status <span id="uptime">00:00:00</span></div>
+      <div class="status-line"><span class="dot ok" id="detector-dot"></span> Detector <span id="detector-status">Waiting for data...</span></div>
+      <div class="status-line"><span class="dot ok"></span> Server Online</div>
+      {% if role != 'admin' %}
+      <div class="status-line" style="color:var(--text-faint)">&#128065; Viewer (read-only)</div>
+      {% endif %}
+      <div class="status-line" style="color:var(--text-faint)">&#128100; {{ username }}</div>
+      <div class="status-line"><a href="/logout" style="color:var(--text-faint); text-decoration:none;">&#128274; Sign out</a></div>
+      <div class="status-line">
+        <button id="theme-toggle" class="theme-toggle-btn" type="button" aria-label="Switch between dark and light theme">
+          <span id="theme-toggle-icon">&#9789;</span> <span id="theme-toggle-label">Dark theme</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="content">
+
+    <!-- DASHBOARD TAB -->
+    <section class="tab active" id="tab-dashboard">
+      <header class="topbar">
+        <div>
+          <div class="live-dot">&#9679; LIVE DASHBOARD</div>
+          <div class="breadcrumb">CROWD GUARD AI / Overview</div>
+        </div>
+        <div class="clock" id="clock"></div>
+      </header>
+
+      <!-- Multi-camera switcher: one card per camera that has ever posted
+           to this server. Click a card to focus the live feed / stats on
+           that camera; "combined" reflects every camera at once. -->
+      <div class="panel-title-row" style="margin-bottom:8px;">
+        <div class="panel-title">&#128247; CAMERAS <span class="card-value pill" id="combined-risk-pill" style="font-size:12px; padding:3px 10px; vertical-align:middle;">SAFE</span></div>
+      </div>
+      <div class="cam-switcher" id="cam-switcher">
+        <div class="cam-chip active" data-camera-id="cam1">cam1 <span class="cam-chip-count">0</span></div>
+      </div>
+
+      <div class="cards">
+        <div class="card">
+          <div class="card-label">&#128101; Current Crowd</div>
+          <div class="card-value" id="current-count">0</div>
+          <div class="card-sub">of <span id="max-cap-label">100</span> max capacity</div>
+        </div>
+        <div class="card">
+          <div class="card-label">&#9888; Risk Level</div>
+          <div class="card-value pill" id="risk-pill">SAFE</div>
+        </div>
+        <div class="card accent-warning">
+          <div class="card-label">&#128276; Active Alerts</div>
+          <div class="card-value" id="active-alerts">0</div>
+        </div>
+        <div class="card">
+          <div class="card-label">&#128225; Capacity Used</div>
+          <div class="card-value" id="capacity-pct">0%</div>
+        </div>
+      </div>
+
+      <!-- Plain-language status headline - "Current Status: <level> Crowd,
+           Action: <top recommendation>" - so an operator gets the gist in
+           one glance instead of reading the full clearance plan below.
+           Same risk signal as the RISK LEVEL card, just in the wording
+           requested for quick scanning. -->
+      <div class="panel" id="status-summary-panel" style="padding:14px 20px;">
+        <span class="deploy-label">Current Status:</span>
+        <span class="card-value pill" id="status-crowdlevel" style="font-size:13px; padding:4px 12px; margin:0 10px 0 6px; vertical-align:middle;">-</span>
+        <span class="deploy-label">Action:</span>
+        <span id="status-action" style="color:var(--text); margin-left:6px;">Waiting for live data...</span>
+      </div>
+
+      <!-- Police deployment recommendation - new feature, given its own
+           prominent spot since it's an actionable output, not just a stat -->
+      <div class="deploy-card">
+        <div class="deploy-head">
+          <div class="deploy-number" id="police-count">0</div>
+          <div class="deploy-label">&#128663; Recommended Officers On-Site</div>
+        </div>
+        <div class="deploy-reason" id="police-reason">Waiting for live data...</div>
+        <div class="deploy-note">
+          Rule-based estimate from current headcount, risk level, and short-term crowd growth trend -
+          not a certified safety standard. Adjust the ratios in Alerts &amp; Controls to match your
+          venue's actual security policy. Always defer to trained personnel for real deployment decisions.
+        </div>
+      </div>
+
+      <div class="panels">
+        <div class="panel feed-panel">
+          <div class="panel-title">LIVE FEED <span class="rec">&#9679; LIVE</span></div>
+          <div class="feed-frame">
+            <span class="corner-tl"></span><span class="corner-tr"></span>
+            <span class="corner-bl"></span><span class="corner-br"></span>
+            <img id="live-feed" src="" alt="Waiting for camera feed...">
+            <div class="feed-empty" id="feed-empty">Waiting for detection_client.py to connect...</div>
+          </div>
+          <div class="id-legend">
+            <span class="swatch" style="background:#ffffff"></span> Each box marks one detected person in the current frame.
+          </div>
+          <div class="cam-location" id="cam-location">&#128205; Location not configured</div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">CROWD DENSITY - LIVE</div>
+          <canvas id="miniChart" height="220"></canvas>
+        </div>
+      </div>
+
+      <!-- Zone/density grid - shows WHERE in the frame people are
+           concentrated, not just a single venue-wide count. Populated
+           only if the active camera's detection_client.py is sending
+           zone_counts (ZONE_ROWS/ZONE_COLS > 1). -->
+      <div class="panel zone-panel" id="zone-panel" style="display:none;">
+        <div class="panel-title">&#128506; ZONE DENSITY MAP</div>
+        <div class="zone-grid" id="zone-grid"></div>
+        <div class="deploy-note">
+          Each cell is a region of this camera's frame, colored by how crowded that
+          region is relative to an even share of max capacity - so a local crush near
+          one exit shows up even while the venue-wide average still reads SAFE.
+        </div>
+      </div>
+
+      <!-- Crowd-clearance action plan - rule-based recommendation so
+           officials get a starting checklist immediately instead of
+           spending time improvising one. -->
+      <div class="panel plan-panel">
+        <div class="panel-title-row">
+          <div class="panel-title">&#128203; RECOMMENDED CLEARANCE PLAN</div>
+          <div class="sms-status" id="sms-status"></div>
+        </div>
+        <ol class="plan-list" id="clearance-plan">
+          <li class="plan-empty">Waiting for live data...</li>
+        </ol>
+        <div class="deploy-note">
+          Rule-based checklist from the current risk level and short-term crowd trend - a
+          starting point to confirm on-site, not an automatic order. When risk crosses into
+          WARNING/CRITICAL, this plan's top action is also texted to the configured officials
+          along with a map link to this camera's GPS location.
+        </div>
+      </div>
+    </section>
+
+    <!-- ANALYTICS TAB -->
+    <section class="tab" id="tab-analytics">
+      <header class="topbar">
+        <div>
+          <div class="live-dot">&#9679; ANALYTICS</div>
+          <div class="breadcrumb">CROWD GUARD AI / History</div>
+        </div>
+      </header>
+      <div class="cards">
+        <div class="card">
+          <div class="card-label">&#128200; Peak Count</div>
+          <div class="card-value" id="peak-count">0</div>
+          <div class="card-sub">highest recorded, all time</div>
+        </div>
+        <div class="card accent-indigo">
+          <div class="card-label">&#128663; Officers Recommended</div>
+          <div class="card-value" id="analytics-police-count">0</div>
+          <div class="card-sub">current estimate</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">CROWD COUNT OVER TIME (persisted in SQLite)</div>
+        <canvas id="historyChart" height="100"></canvas>
+      </div>
+
+      <!-- Historical/trend analytics beyond the current live session:
+           peak and average count per day, so you can compare today to
+           previous days instead of only seeing the current live window. -->
+      <div class="panel">
+        <div class="panel-title-row">
+          <div class="panel-title">&#128197; DAY-OVER-DAY COMPARISON</div>
+          <select id="cmp-days" class="cmp-days-select">
+            <option value="7">Last 7 days</option>
+            <option value="14">Last 14 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+        </div>
+        <canvas id="dayCompareChart" height="110"></canvas>
+        <div class="deploy-note">Peak and average headcount per day, across all cameras combined.</div>
+      </div>
+
+      <!-- CSV export for after-action review - pulls the FULL persisted
+           history/alerts (not just what's currently loaded live) straight
+           from SQLite as a downloadable .csv. Plain links, not JS fetches -
+           the browser's existing session cookie authenticates the download
+           the same way it authenticates every other page on this dashboard. -->
+      <div class="panel">
+        <div class="panel-title">&#128190; EXPORT DATA (CSV)</div>
+        <div class="export-row">
+          <a class="btn" id="export-history-current" href="#">History - current camera</a>
+          <a class="btn" href="/api/export/history.csv">History - all cameras</a>
+          <a class="btn" href="/api/export/alerts.csv">Alerts (all cameras)</a>
+          {% if role == 'admin' %}
+          <a class="btn" href="/api/export/audit.csv">Audit log (admin only)</a>
+          {% endif %}
+        </div>
+        <div class="deploy-note">
+          Exports read the full SQLite history, not just what's currently loaded in the
+          live dashboard - useful for after-action review or reporting to a venue safety
+          committee. Each export is itself logged to the audit trail.
+        </div>
+      </div>
+    </section>
+
+    <!-- ALERTS TAB -->
+    <section class="tab" id="tab-alerts">
+      <header class="topbar">
+        <div>
+          <div class="live-dot">&#9679; ALERTS &amp; CONTROLS</div>
+          <div class="breadcrumb">CROWD GUARD AI / Threat Management</div>
+        </div>
+      </header>
+
+      <div class="panels">
+        <div class="panel">
+          <div class="panel-title-row">
+            <div class="panel-title">THREAT TIMELINE</div>
+            {% if role == 'admin' %}
+            <button class="btn danger" id="btn-panic">&#9888; SIMULATE EMERGENCY</button>
+            {% endif %}
+          </div>
+          <div id="alert-list" class="alert-list"></div>
+
+          <div class="panel-title" style="margin-top:20px">&#128241; SMS NOTIFICATIONS TO OFFICIALS</div>
+          <div id="sms-list" class="alert-list"></div>
+        </div>
+
+        <!-- What-if scenario planner - a pure "what happens if..." projection
+             using the same rule engine as live monitoring, run against a
+             hypothetical headcount/capacity. Never touches real camera state,
+             history, or triggers real alerts/SMS - available to viewers too
+             since it can't change anything. -->
+        <div class="panel" id="whatif-panel">
+          <div class="panel-title">&#129504; WHAT-IF SCENARIO PLANNER</div>
+          <div class="deploy-note" style="margin:0 0 12px">
+            Explore a hypothetical before it happens - e.g. "what if 300 more people arrive"
+            or "what if Gate 2 closes and we lose 30% capacity". This only calculates a
+            projection; it never changes the live dashboard, history, or triggers real alerts.
+          </div>
+          <label>Additional people arriving (use a negative number to model people leaving)
+            <input type="number" id="whatif-extra-people" value="0" step="10">
+          </label>
+          <label>Effective capacity (%) - lower this to model closing a gate/exit
+            <input type="number" id="whatif-capacity-pct" value="100" min="10" max="200" step="5">
+          </label>
+          <button class="btn" id="btn-whatif-run" style="margin-top:6px; width:100%">Run Simulation</button>
+          <div id="whatif-result" style="display:none; margin-top:16px;">
+            <div class="deploy-head" style="gap:10px;">
+              <span class="card-value pill" id="whatif-crowdlevel">LOW</span>
+              <span class="deploy-label" id="whatif-counts">- people / - capacity</span>
+            </div>
+            <div class="deploy-reason"><b>Action:</b> <span id="whatif-action">-</span></div>
+            <div class="deploy-reason" id="whatif-police">-</div>
+          </div>
+        </div>
+
+        <div>
+          {% if role == 'admin' %}
+          <div class="panel">
+            <div class="panel-title">&#128205; CAMERA GPS LOCATION</div>
+            <label>Location label
+              <input type="text" id="cfg-cam-label" placeholder="e.g. Main Gate Camera">
+            </label>
+            <label>Latitude
+              <input type="number" step="any" id="cfg-cam-lat" placeholder="e.g. 11.9416">
+            </label>
+            <label>Longitude
+              <input type="number" step="any" id="cfg-cam-lon" placeholder="e.g. 79.8083">
+            </label>
+            <label class="live-gps-toggle">
+              <input type="checkbox" id="cfg-cam-live-gps">
+              &#128225; Use this device's live GPS (updates automatically)
+            </label>
+            <div class="deploy-note" id="live-gps-status">Off - lat/long above can be entered manually.</div>
+            <div class="deploy-note">
+              Turn this on from whichever device is physically at the camera (e.g. a phone at
+              the gate, or a laptop in a ground-control vehicle for a drone). The browser's own
+              GPS then keeps latitude/longitude - and every alert/SMS map link - updated in
+              real time, instead of you typing coordinates in by hand.
+            </div>
+            <label>Officials' phone numbers (comma-separated, with country code)
+              <input type="text" id="cfg-officials-phone" placeholder="+91XXXXXXXXXX, +91YYYYYYYYYY">
+            </label>
+            <div class="deploy-note">
+              SMS is sent via Twilio. Without <code>TWILIO_ACCOUNT_SID</code>,
+              <code>TWILIO_AUTH_TOKEN</code>, and <code>TWILIO_FROM_NUMBER</code> set as
+              environment variables on the server, alerts are logged here but not actually
+              texted (safe to leave unset for a demo).
+            </div>
+
+            <label style="margin-top:16px;">Officials by locality (nearest official + 1 backup are texted)</label>
+            <div class="deploy-note">
+              Register officials with their locality (e.g. "Tambaram", "Vandalur") - type a
+              known locality and its GPS is filled in automatically, or enter latitude/longitude
+              yourself for an exact duty-post location. When crowd is detected, the SMS goes to
+              the nearest official (&#129351; PRIORITY 1) plus one backup (&#129352; PRIORITY 2) -
+              not everyone. Leave location and latitude/longitude blank to still register
+              someone (and text them) without a priority rank. Add as many officials as you
+              need - 50+ is fine.
+            </div>
+            <div class="deploy-note">
+              &#128273; Each official can have their OWN login for the mobile app (acknowledge
+              alerts, report incidents, press SOS) instead of everyone sharing one admin-issued
+              token - so the activity log below can name the specific officer, the same way it
+              already names individual admin/viewer accounts. Click &#128273; next to an
+              official to set or reset their username/password.
+            </div>
+            <div class="official-add-row">
+              <input type="text" id="official-name" placeholder="Name">
+              <input type="text" id="official-phone" placeholder="+91XXXXXXXXXX">
+              <input type="text" id="official-location" placeholder="Locality (e.g. Tambaram)" list="locality-options">
+              <input type="text" id="official-lat" placeholder="Latitude (optional)">
+              <input type="text" id="official-lon" placeholder="Longitude (optional)">
+              <button class="btn" id="btn-add-official">+ Add</button>
+            </div>
+            <datalist id="locality-options">
+              <option value="Tambaram">
+              <option value="Vandalur">
+              <option value="Kodambakkam">
+              <option value="Sanatorium">
+              <option value="Chromepet">
+              <option value="Pallavaram">
+              <option value="Guindy">
+              <option value="Perungalathur">
+              <option value="Selaiyur">
+              <option value="Medavakkam">
+              <option value="Velachery">
+              <option value="Adyar">
+              <option value="Tirusulam">
+              <option value="Pammal">
+            </datalist>
+            <div id="officials-list" class="alert-list"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-title">&#128197; SHIFT / DUTY ROSTER</div>
+            <div class="deploy-note">
+              Schedule which official covers which zone/gate and when. A shift can repeat every
+              day or run on one specific weekday, and an end time earlier than the start time
+              (e.g. 22:00 &#8594; 06:00) is treated as an overnight shift. When crowd risk needs
+              a dispatch, whoever's roster currently has them covering that exact gate is
+              recommended first (&#128994; ON ROSTER) - ahead of anyone who's merely standing
+              closer at that moment - via <code>GET /api/officials/nearest</code>. This never
+              overrides an officer's own on/off-duty toggle, it just adds a schedule on top of it.
+            </div>
+            <div class="roster-add-row">
+              <select id="roster-official"><option value="">Official...</option></select>
+              <select id="roster-camera"><option value="">Zone/gate...</option></select>
+              <select id="roster-day">
+                <option value="">Every day</option>
+                <option value="0">Monday</option>
+                <option value="1">Tuesday</option>
+                <option value="2">Wednesday</option>
+                <option value="3">Thursday</option>
+                <option value="4">Friday</option>
+                <option value="5">Saturday</option>
+                <option value="6">Sunday</option>
+              </select>
+              <input type="time" id="roster-start" value="09:00">
+              <input type="time" id="roster-end" value="17:00">
+              <button class="btn" id="btn-add-roster">+ Add shift</button>
+            </div>
+            <div id="roster-list" class="alert-list"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-title">CAPACITY THRESHOLDS</div>
+            <label>Max Capacity
+              <input type="number" id="cfg-max" value="10000">
+            </label>
+            <label>Warning at (%)
+              <input type="number" id="cfg-warn" value="60">
+            </label>
+            <label>Critical at (%)
+              <input type="number" id="cfg-crit" value="85">
+            </label>
+
+            <div class="panel-title" style="margin-top:20px">DEMO CONTROLS</div>
+            <div class="sim-grid">
+              <button class="btn" data-action="add">+50 People</button>
+              <button class="btn" data-action="remove">-50 People</button>
+              <button class="btn" data-action="clear">Clear System</button>
+            </div>
+          </div>
+
+          <!-- Configurable alert cooldown: previously fixed in code (30s /
+               120s), now editable so a venue can tune how often the
+               Threat Timeline / SMS re-fire during a sustained WARNING or
+               CRITICAL period, instead of risking an SMS storm at exactly
+               the threshold. -->
+          <div class="panel">
+            <div class="panel-title">&#9202; ALERT COOLDOWN</div>
+            <label>On-screen alert cooldown (seconds)
+              <input type="number" id="cfg-alert-cooldown" value="30">
+            </label>
+            <label>SMS cooldown (seconds)
+              <input type="number" id="cfg-sms-cooldown" value="120">
+            </label>
+            <div class="deploy-note">
+              How long to wait before re-firing an alert/SMS at the same risk level (an
+              escalation to a higher tier always fires immediately regardless of cooldown).
+              Keep SMS cooldown longer than the alert cooldown so officials aren't texted
+              as often as the on-screen timeline updates.
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-title">&#128663; DEPLOYMENT PLANNER</div>
+            <label>People per officer - SAFE
+              <input type="number" id="cfg-ratio-safe" value="40">
+            </label>
+            <label>People per officer - WARNING
+              <input type="number" id="cfg-ratio-warn" value="25">
+            </label>
+            <label>People per officer - CRITICAL
+              <input type="number" id="cfg-ratio-crit" value="12">
+            </label>
+            <label>Minimum officers on-site
+              <input type="number" id="cfg-min-officers" value="2">
+            </label>
+            <button class="btn" id="btn-save-cfg" style="margin-top:14px; width:100%">Save All Settings</button>
+          </div>
+
+          <div class="panel">
+            <div class="panel-title">&#128220; ADMIN ACTIVITY LOG</div>
+            <div class="deploy-note">
+              Logins, config edits, and demo/panic triggers - who (by role/IP)
+              did what, and when. Kept for accountability since everyone with
+              the admin key shares one identity.
+            </div>
+            <div id="audit-log-list" class="alert-list"></div>
+          </div>
+
+          <!-- Individual admin/viewer accounts, on top of the original
+               shared-key auth - lets the audit log above say WHO (not just
+               "admin"/role+IP) did something. The shared ADMIN_API_KEY /
+               VIEWER_API_KEY still work (for detection_client.py and as a
+               login fallback); this is additive. -->
+          <div class="panel">
+            <div class="panel-title">&#128100; ADMIN &amp; VIEWER ACCOUNTS</div>
+            <div class="deploy-note">
+              Give each person their own login so the activity log above can name them
+              individually, instead of everyone sharing one admin key.
+            </div>
+            <div id="users-list" class="alert-list"></div>
+            <label>Username
+              <input type="text" id="new-user-name" placeholder="e.g. priya">
+            </label>
+            <label>Password
+              <input type="password" id="new-user-pass" placeholder="at least 6 characters">
+            </label>
+            <label>Role
+              <select id="new-user-role">
+                <option value="viewer">Viewer (read-only)</option>
+                <option value="admin">Admin (full access)</option>
+              </select>
+            </label>
+            <button class="btn" id="btn-add-user" style="margin-top:10px; width:100%">Add Account</button>
+          </div>
+          {% else %}
+          <div class="panel">
+            <div class="panel-title">VIEWER MODE</div>
+            <div class="deploy-note">
+              You're signed in with a read-only viewer key. Camera GPS location,
+              capacity thresholds, deployment ratios, and demo/simulation
+              controls are only editable by an admin key.
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}?v={{ v }}"></script>
+</body>
+</html>
