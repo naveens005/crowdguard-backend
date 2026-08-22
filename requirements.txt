@@ -19,6 +19,7 @@ python-dotenv       # lets app.py auto-load Twilio credentials from a .env file
 # section in README.md for why `python app.py` isn't enough for a public
 # server. Not needed for a local demo.
 gunicorn
+gevent
 eventlet
 
 # Device tokens (optional) - lets you issue a separate, narrower, expiring

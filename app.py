@@ -62,7 +62,7 @@ def _payload_too_large(_e):
     return jsonify({"ok": False, "error": "Request body too large."}), 413
 
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "crowdguard.db")
