@@ -1,3 +1,4 @@
+# Railway optimized version
 """
 CROWD GUARD 2.0 - Live Backend Server (multi-camera, SQLite persistence)
 ----------------------------------------------------------------------
