@@ -1,45 +1,9 @@
-# CROWD GUARD 2.0 - dependencies
-# Server (app.py)
 flask
 flask-socketio
-
-# Detection client (detection_client.py)
-opencv-python
-numpy
 requests
-ultralytics
-torch          # install the CUDA build from pytorch.org if you have an NVIDIA GPU
-
-# SMS alerts to officials (optional - app.py runs fine without this installed,
-# it just falls back to logging alerts instead of texting them)
 twilio
-python-dotenv       # lets app.py auto-load Twilio credentials from a .env file
-
-# Production deployment only (Render, Heroku, etc.) - see the "Deployment"
-# section in README.md for why `python app.py` isn't enough for a public
-# server. Not needed for a local demo.
+python-dotenv
 gunicorn
 gevent
-eventlet
-
-# Device tokens (optional) - lets you issue a separate, narrower, expiring
-# credential per camera via /api/device-token, instead of every
-# detection_client.py sharing the one all-powerful ADMIN_API_KEY. app.py
-# runs fine without this installed; that endpoint just returns a clear
-# "not installed" error and the shared admin key keeps working as before.
+gevent-websocket
 pyjwt
-
-# HTTPS for local testing only (optional) - lets you run
-# `python app.py --https` to get a self-signed cert so you can test with a
-# real https:// URL on your own machine (e.g. because browser geolocation
-# for the Live GPS feature requires a secure context on most phones/some
-# browsers). NOT for production - real deployments get real TLS from
-# whatever's in front of them (Render, a reverse proxy, etc.), see README.
-pyopenssl
-
-# Push notifications to the official mobile app (optional) - lets app.py
-# send Firebase Cloud Messaging pushes via FCM_SERVER_KEY, alongside (never
-# instead of) the existing Twilio SMS. app.py runs fine without this
-# installed or without FCM_SERVER_KEY set; it just logs pushes instead of
-# sending them, same fallback pattern as Twilio above.
-requests
