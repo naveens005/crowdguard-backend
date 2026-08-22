@@ -62,6 +62,12 @@ def _payload_too_large(_e):
     return jsonify({"ok": False, "error": "Request body too large."}), 413
 
 
+@app.route("/health")
+def health_check():
+    """Simple health check for cloud platforms like Railway."""
+    return jsonify({"status": "healthy", "ts": time.time()}), 200
+
+
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
