@@ -7,3 +7,5 @@ gunicorn
 gevent
 gevent-websocket
 pyjwt
+packaging
+setuptools
