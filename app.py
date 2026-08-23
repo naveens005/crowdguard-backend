@@ -1,6 +1,6 @@
 # Railway optimized version
 """
-CROWD GUARD 2.0 - Live Backend Server (multi-camera, SQLite persistence)
+CROWD GUARD 3.0 - Live Backend Server (multi-camera, SQLite persistence)
 ----------------------------------------------------------------------
 Receives real people-count data from one or more detection_client.py
 instances (each running YOLO on its own camera feed) and broadcasts it

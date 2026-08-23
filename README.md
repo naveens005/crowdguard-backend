@@ -1,4 +1,4 @@
-# CROWD GUARD 2.0
+# CROWD GUARD 3.0
 
 Real-time crowd detection and monitoring dashboard, with optional SMS alerts
 to officials when crowd risk crosses a threshold.

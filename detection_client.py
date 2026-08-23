@@ -1,5 +1,5 @@
 """
-CROWD GUARD 2.0 - Detection Client
+CROWD GUARD 3.0 - Detection Client
 --------------------------------------------------
 Reads live video (a phone IP camera by default, or a laptop webcam) and runs
 YOLO person-detection on each frame, then posts the current headcount to
