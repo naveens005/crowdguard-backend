@@ -51,7 +51,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # CONFIG - edit these for your setup
 # ---------------------------------------------------------------------------
-VIDEO_URL = os.environ.get("VIDEO_URL", "http://10.43.154.190:8080/video")
+VIDEO_URL = os.environ.get("VIDEO_URL", "http://192.168.31.66:8080/video")
                 # phone IP camera app URL (use 0 instead for the laptop's
                 # built-in webcam). Overridable via VIDEO_URL in .env so
                 # each camera's instance of this script can point at its
