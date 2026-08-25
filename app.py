@@ -3016,6 +3016,7 @@ def _apply_live_update(data: dict):
         except (TypeError, ValueError):
             pass  # malformed zone data just gets ignored, count still applies
 
+    frame_b64 = data.get("frame")
     is_black = data.get("is_black", False)
 
     cam["current_count"] = count

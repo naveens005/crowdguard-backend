@@ -420,7 +420,7 @@ def main():
                 cv2.waitKey(100)
                 continue
 
-            is_black = np.mean(frame) < 5
+            is_black = bool(np.mean(frame) < 5)
             if is_black:
                 black_frame_count += 1
                 if black_frame_count > 10:
