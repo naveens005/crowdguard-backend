@@ -4,8 +4,7 @@ requests
 twilio
 python-dotenv
 gunicorn
-gevent
-gevent-websocket
+eventlet
 pyjwt
 packaging
 setuptools
