@@ -69,7 +69,7 @@ def health_check():
     return jsonify({"status": "healthy", "ts": time.time()}), 200
 
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "crowdguard.db")
