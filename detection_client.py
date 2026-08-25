@@ -165,7 +165,7 @@ def draw_people(frame, boxes):
     return annotated
 
 
-SERVER_URL = os.environ.get("SERVER_URL", "https://crowdguard-backend-2.onrender.com")
+SERVER_URL = os.environ.get("SERVER_URL", "http://127.0.0.1:5000")
 ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", "")   # must match the server's
                                         # ADMIN_API_KEY (printed in its console
                                         # on startup, or set in its .env) - the
