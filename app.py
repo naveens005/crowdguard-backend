@@ -3317,11 +3317,14 @@ if __name__ == "__main__":
         print("        `pip install pyopenssl`. Do not use --https for a real")
         print("        deployment - see README.md instead.\n")
 
-    socketio.run(
-        app,
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 5000)),
-        debug=False,
-        allow_unsafe_werkzeug=True,
-        ssl_context=ssl_context,
-    )
+    run_args = {
+        "app": app,
+        "host": "0.0.0.0",
+        "port": int(os.environ.get("PORT", 5000)),
+        "debug": False,
+        "allow_unsafe_werkzeug": True
+    }
+    if ssl_context:
+        run_args["ssl_context"] = ssl_context
+
+    socketio.run(**run_args)
