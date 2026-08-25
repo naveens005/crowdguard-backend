@@ -103,6 +103,8 @@ let activeCameraId = "cam1";
 // ---------- Live feed polling (works across devices without MJPEG hassles) ----------
 const feedImg = document.getElementById("live-feed");
 const feedEmpty = document.getElementById("feed-empty");
+const feedBackground = document.getElementById("feed-background");
+
 // Setting img.src directly and reacting to its own load/error events
 // downloads each frame exactly once (a separate fetch() call here used to
 // download every frame a second time for no reason).
@@ -449,6 +451,10 @@ socket.on("state_update", data => {
   // the update is for whichever camera is currently focused.
   renderCameraSwitcher(data.cameras, data.combined_risk_level);
   if (data.camera_id && data.camera_id !== activeCameraId) return;
+
+  if (feedBackground) {
+    feedBackground.style.display = data.is_black ? "flex" : "none";
+  }
 
   maxCapacity = data.max_capacity;
   applyState(data.current_count, data.risk_level,

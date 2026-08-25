@@ -115,6 +115,11 @@
             <span class="corner-bl"></span><span class="corner-br"></span>
             <img id="live-feed" src="" alt="Waiting for camera feed...">
             <div class="feed-empty" id="feed-empty">Waiting for detection_client.py to connect...</div>
+            <div class="feed-empty" id="feed-background" style="display:none; width: 100%; height: 100%; top: 0; left: 0; transform: none; background: rgba(0,0,0,0.85); color: #ff8d4c; flex-direction: column; align-items: center; justify-content: center; border-radius: 18px; z-index: 10;">
+                <div style="font-size: 24px; margin-bottom: 10px;">&#9888; BLACK FEED DETECTED</div>
+                <div style="font-size: 14px; font-weight: 600;">The camera app might be in the background or obscured.</div>
+                <div style="font-size: 12px; margin-top: 15px; opacity: 0.8; max-width: 80%;">Keep the IP Webcam app in the foreground on your phone to maintain the live feed.</div>
+            </div>
           </div>
           <div class="id-legend">
             <span class="swatch" style="background:#ffffff"></span> Each box marks one detected person in the current frame.

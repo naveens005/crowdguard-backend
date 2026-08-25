@@ -3016,11 +3016,12 @@ def _apply_live_update(data: dict):
         except (TypeError, ValueError):
             pass  # malformed zone data just gets ignored, count still applies
 
-    frame_b64 = data.get("frame")
+    is_black = data.get("is_black", False)
 
     cam["current_count"] = count
     now = time.time()
     cam["last_seen"] = now
+    cam["is_black"] = is_black
 
     # The reading's own capture time (offline resilience, feature 7): when
     # this came from a queued-then-flushed batch (see /api/update/batch),
@@ -3096,6 +3097,7 @@ def _apply_live_update(data: dict):
         "zone_rows": cam["zone_rows"],
         "zone_cols": cam["zone_cols"],
         "zone_risk": zone_risk_levels(cam),
+        "is_black": is_black,
         "combined_risk_level": combined_risk_level(),
         "combined_current_count": combined_current_count(),
         "cameras": [camera_summary(c) for c in CAMERAS.values()],
@@ -3260,6 +3262,7 @@ def api_simulate(action):
         "zone_rows": cam["zone_rows"],
         "zone_cols": cam["zone_cols"],
         "zone_risk": zone_risk_levels(cam),
+        "is_black": is_black,
         "combined_risk_level": combined_risk_level(),
         "combined_current_count": combined_current_count(),
         "cameras": [camera_summary(c) for c in CAMERAS.values()],

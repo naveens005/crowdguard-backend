@@ -224,22 +224,28 @@ class LatestFrame:
         self.frame = None
         self.lock = threading.Lock()
         self.running = True
+        self.last_update_time = 0
+        self.source_label = str(source)
 
         if isinstance(source, str) and "/video" in source:
             # Use snapshot polling instead of the raw MJPEG stream -
             # more reliable with OpenCV/FFmpeg for phone IP-cam apps.
             self.snapshot_url = source.replace("/video", "/shot.jpg")
             self.cap = None
-            test = requests.get(self.snapshot_url, timeout=3)
-            if test.status_code != 200:
-                raise RuntimeError("Unable to open the camera stream.")
+            try:
+                test = requests.get(self.snapshot_url, timeout=3)
+                if test.status_code != 200:
+                    print(f"\n[warning] Initial check failed for {self.snapshot_url} (Status: {test.status_code})")
+            except Exception as e:
+                print(f"\n[warning] Could not connect to {self.snapshot_url}: {e}")
+
             self.thread = threading.Thread(target=self._read_snapshots, daemon=True)
         else:
             backend = cv2.CAP_DSHOW if isinstance(source, int) else cv2.CAP_FFMPEG
             self.cap = cv2.VideoCapture(source, backend)
             self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             if not self.cap.isOpened():
-                raise RuntimeError("Unable to open the camera stream.")
+                print(f"\n[warning] OpenCV could not open source: {source}")
             self.thread = threading.Thread(target=self._read_frames, daemon=True)
 
         self.thread.start()
@@ -248,26 +254,40 @@ class LatestFrame:
         while self.running:
             try:
                 resp = requests.get(self.snapshot_url, timeout=3)
-                arr = np.frombuffer(resp.content, dtype=np.uint8)
-                frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-                if frame is not None:
-                    with self.lock:
-                        self.frame = frame
+                if resp.status_code == 200:
+                    arr = np.frombuffer(resp.content, dtype=np.uint8)
+                    frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+                    if frame is not None:
+                        with self.lock:
+                            self.frame = frame
+                            self.last_update_time = time.time()
+                else:
+                    time.sleep(0.1)
             except requests.exceptions.RequestException:
-                time.sleep(0.1)
+                time.sleep(0.5)
 
     def _read_frames(self):
         while self.running:
+            if self.cap is None or not self.cap.isOpened():
+                time.sleep(1.0)
+                continue
             ok, frame = self.cap.read()
             if not ok:
-                time.sleep(0.02)
+                time.sleep(0.1)
                 continue
             with self.lock:
                 self.frame = frame
+                self.last_update_time = time.time()
 
     def get(self):
         with self.lock:
+            # If no fresh frame for 5 seconds, treat it as offline/dead
+            if time.time() - self.last_update_time > 5.0:
+                return None
             return None if self.frame is None else self.frame.copy()
+
+    def is_stale(self):
+        return time.time() - self.last_update_time > 5.0
 
     def close(self):
         self.running = False
@@ -284,7 +304,7 @@ def _auth_headers():
     return {}
 
 
-def send_update(count, annotated_frame=None, zone_counts=None):
+def send_update(count, annotated_frame=None, zone_counts=None, is_black=False):
     """POST the latest count (and optionally a frame / zone breakdown) to
     the server. Runs in a background thread so a slow/failed network call
     never blocks the detection loop.
@@ -298,7 +318,7 @@ def send_update(count, annotated_frame=None, zone_counts=None):
     retrying it in the background. A rejected request (401/400) is NOT
     queued - retrying the same bad auth or malformed data would just fail
     again, so that's still surfaced as a warning like before."""
-    core_payload = {"count": count, "camera_id": CAMERA_ID, "client_ts": time.time()}
+    core_payload = {"count": count, "camera_id": CAMERA_ID, "client_ts": time.time(), "is_black": is_black}
     if CAMERA_LABEL:
         core_payload["label"] = CAMERA_LABEL
     if zone_counts is not None:
@@ -365,28 +385,48 @@ def _flush_offline_queue():
 
 def main():
     model = YOLO(MODEL_PATH)
+    print("\n" + "="*50)
+    print("CROWD GUARD 3.0 - Detection Client Starting")
+    print("="*50)
     print(f"Camera ID: {CAMERA_ID}" + (f"  (\"{CAMERA_LABEL}\")" if CAMERA_LABEL else ""))
+    print(f"Video URL: {VIDEO_URL}")
+    print(f"Server URL: {SERVER_URL}")
     print(f"Running inference on: {DEVICE} "
           f"({'GPU - fast' if DEVICE != 'cpu' else 'CPU - consider a GPU for lower latency'})")
+
+    if "127.0.0.1" in VIDEO_URL or "localhost" in VIDEO_URL:
+         print("\n[tip] Using a local camera? Ensure your IP Webcam app is open and visible.")
+
     if ZONE_ROWS > 1 or ZONE_COLS > 1:
         print(f"Zone grid: {ZONE_ROWS}x{ZONE_COLS} (per-cell density reported to the server)")
+
     pending = OFFLINE_QUEUE.pending_count()
     if pending:
-        print(f"Offline queue: {pending} report(s) left over from a previous outage - "
-              f"will sync automatically once the server's reachable")
+        print(f"Offline queue: {pending} report(s) left over from a previous outage")
+
     threading.Thread(target=_flush_offline_queue, daemon=True).start()
     stream = LatestFrame(VIDEO_URL)
     frame_counter = 0
-    frame_times = deque(maxlen=30)   # for a live FPS readout - lets you actually
-                                      # SEE the effect of DEVICE/IMAGE_SIZE changes
-                                      # instead of guessing whether it got faster
+    frame_times = deque(maxlen=30)
+
+    black_frame_count = 0
 
     try:
         while True:
             frame = stream.get()
             if frame is None:
-                cv2.waitKey(1)
+                if stream.is_stale():
+                    print(f"\r[warning] Camera stream is STALE. Check if IP Webcam app is open on {VIDEO_URL}   ", end="", flush=True)
+                cv2.waitKey(100)
                 continue
+
+            is_black = np.mean(frame) < 5
+            if is_black:
+                black_frame_count += 1
+                if black_frame_count > 10:
+                    print(f"\r[warning] Received BLACK frames. The camera app might be in the background!   ", end="", flush=True)
+            else:
+                black_frame_count = 0
 
             result = model.predict(frame, classes=[0], conf=CONFIDENCE,
                                     imgsz=IMAGE_SIZE, device=DEVICE,
@@ -414,7 +454,7 @@ def main():
 
             frame_counter += 1
             send_frame = annotated if frame_counter % SEND_FRAME_EVERY_N == 0 else None
-            send_update(people_count, send_frame, zone_counts)
+            send_update(people_count, send_frame, zone_counts, is_black=is_black)
 
             if SHOW_LOCAL_WINDOW:
                 cv2.imshow("Crowd Detection - Low Latency", annotated)
