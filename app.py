@@ -447,6 +447,7 @@ def camera_summary(cam):
         "zone_rows": cam["zone_rows"],
         "zone_cols": cam["zone_cols"],
         "online": (now - cam["last_seen"]) <= CAMERA_STALE_AFTER_SEC,
+        "is_black": cam.get("is_black", False),
         "last_seen_ago": round(now - cam["last_seen"], 1) if cam["last_seen"] else None,
     }
 
@@ -1960,7 +1961,7 @@ def api_audit_log():
 
 
 @app.route("/api/frame.jpg")
-@require_viewer_or_admin
+@require_official_or_dashboard
 def api_frame():
     camera_id = request.args.get("camera_id") or DEFAULT_CAMERA_ID
     jpeg = LATEST_FRAMES.get(camera_id)
